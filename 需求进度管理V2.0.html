@@ -1,0 +1,1365 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>项目管理系统 - 可交互原型 v8.4</title>
+    <style>
+        /* --- 全局样式 --- */
+        :root {
+            --primary-color: #3498db; --secondary-color: #2c3e50; --background-color: #f4f7fa;
+            --container-bg: #ffffff; --border-color: #e0e6ed; --text-color: #333;
+            --text-light: #777; --success-color: #2ecc71; --warning-color: #f39c12;
+            --danger-color: #e74c3c; --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+        body { font-family: var(--font-family); margin: 0; background-color: var(--background-color); color: var(--text-color); padding: 20px; }
+        .hidden { display: none !important; }
+
+        /* --- 容器与卡片样式 --- */
+        .container { max-width: 1920px; margin: 0 auto; background-color: var(--container-bg); padding: 25px; border-radius: 10px; box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08); position: relative;}
+
+        /* --- 顶部导航 --- */
+        .main-nav { display: flex; gap: 10px; border-bottom: 2px solid var(--border-color); margin-bottom: 25px; }
+        .nav-btn { background: none; border: none; padding: 10px 20px; cursor: pointer; font-size: 16px; font-weight: 500; color: var(--text-light); border-bottom: 3px solid transparent; transition: all 0.2s ease; }
+        .nav-btn.active { color: var(--primary-color); border-bottom-color: var(--primary-color); }
+
+        /* --- 角色切换 --- */
+        .role-switcher { position: absolute; top: 20px; right: 25px; display: flex; align-items: center; gap: 10px; font-size: 14px; z-index: 10; }
+
+        /* --- 按钮样式 --- */
+        .btn { padding: 9px 18px; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500; transition: all 0.2s ease; }
+        .btn:disabled { background-color: #bdc3c7; cursor: not-allowed; opacity: 0.7; }
+        .btn-sm { padding: 4px 10px; font-size: 12px; }
+        .btn-primary { background-color: var(--primary-color); color: white; }
+        .btn-primary:hover:not(:disabled) { background-color: #2980b9; }
+        .btn-secondary { background-color: #ecf0f1; color: var(--secondary-color); border: 1px solid var(--border-color); }
+        .btn-secondary:hover:not(:disabled) { background-color: #dadedf; }
+        .btn-danger { background-color: var(--danger-color); color: white; }
+        .btn-danger:hover:not(:disabled) { background-color: #c0392b; }
+        .btn-link { background: none; color: var(--primary-color); padding: 0 5px; font-size: 13px; cursor: pointer; border: none; }
+        .btn-link:disabled { color: #ccc; cursor: not-allowed; }
+        .btn-add { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; border: 1px solid #ccc; background-color: #f8f8f8; cursor: pointer; transition: all 0.2s ease; color: #555; }
+        .btn-add:hover:not(:disabled) { background-color: #e8e8e8; border-color: #999; }
+        .btn-add svg { pointer-events: none; }
+
+        /* --- 浮动菜单 (Popover) --- */
+        .popover-menu { position: absolute; background: white; border: 1px solid var(--border-color); box-shadow: 0 4px 12px rgba(0,0,0,0.1); border-radius: 6px; z-index: 102; padding: 5px 0; min-width: 120px; }
+        .popover-item { display: block; padding: 8px 15px; color: var(--text-color); text-decoration: none; cursor: pointer; font-size: 14px; white-space: nowrap; }
+        .popover-item:hover { background-color: #f4f7fa; }
+
+        /* --- 头部样式 --- */
+        .page-header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 15px; margin-bottom: 25px; }
+        .page-header h1 { margin: 0; color: var(--secondary-color); font-size: 24px; }
+        
+        /* --- 表格通用样式 --- */
+        .data-table-wrapper { overflow-x: auto; }
+        .data-table { width: 100%; border-collapse: collapse; }
+        .data-table { table-layout: auto; min-width: 1500px; } 
+        #project-list-table { min-width: 1000px; }
+        .data-table th, .data-table td { border: 1px solid var(--border-color); padding: 12px 15px; text-align: left; vertical-align: middle; }
+        .data-table td.add-cell { width: 40px; text-align: center; padding: 0 10px; }
+        .data-table td:not(.report-cell) { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 250px; }
+        .data-table th { background-color: #f8f9fc; font-weight: 600; color: var(--secondary-color); text-align: center; }
+        .data-table tr:not(.demand-row):not(.sub-demand-row):hover { background-color: #fafdff; }
+        .data-table .operations-cell { white-space: nowrap; }
+        .status-closed { text-decoration: line-through; color: var(--text-light); }
+        .report-cell { min-width: 250px; white-space: pre-wrap; word-wrap: break-word; font-size: 13px; color: var(--text-light); vertical-align: top; overflow: visible; height: auto; }
+        .clickable-report { cursor: pointer; }
+        .clickable-report:hover { background-color: #f0f8ff; text-decoration: underline; }
+        
+        /* --- 搜索筛选模块 --- */
+        .filter-section { display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 20px; padding: 15px; background-color: #f8f9fc; border-radius: 8px; align-items: center; }
+        .filter-section .filter-group { display: flex; flex-direction: column; }
+        .filter-group label { font-size: 12px; color: var(--text-light); margin-bottom: 5px; }
+        .filter-group input, .filter-group select { padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 5px; font-size: 14px; }
+        
+        /* --- 进度条样式 --- */
+        .progress-bar-container { background-color: #e9ecef; border-radius: 100px; height: 18px; overflow: hidden; width: 100%; position: relative; }
+        .progress-bar-fill { height: 100%; text-align: right; color: white; font-size: 12px; font-weight: bold; line-height: 18px; padding-right: 8px; white-space: nowrap; border-radius: 100px; transition: width 0.6s cubic-bezier(0.25, 0.8, 0.25, 1); background-color: #2ecc71; background-image: linear-gradient(45deg, rgba(255, 255, 255, .15) 25%, transparent 25%, transparent 50%, rgba(255, 255, 255, .15) 50%, rgba(255, 255, 255, .15) 75%, transparent 75%, transparent); background-size: 40px 40px; animation: progress-bar-stripes 2s linear infinite; }
+        @keyframes progress-bar-stripes { from { background-position: 40px 0; } to { background-position: 0 0; } }
+
+        /* --- 需求列表页特定样式 --- */
+        .view-actions { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .view-actions .main-actions { display: flex; gap: 10px; }
+        .gantt-controls { display: flex; gap: 10px; align-items: center; }
+        .gantt-controls .btn-group button { border-radius: 0; border-right-width: 0; }
+        .gantt-controls .btn-group button:first-child { border-top-left-radius: 5px; border-bottom-left-radius: 5px; }
+        .gantt-controls .btn-group button:last-child { border-top-right-radius: 5px; border-bottom-right-radius: 5px; border-right-width: 1px; }
+        .gantt-controls .btn-group button.active { background-color: var(--primary-color); color: white; }
+        
+        /* --- 需求列表冻结列 --- */
+        #demand-list-table th {
+            position: sticky;
+            top: 0;
+            z-index: 3;
+        }
+
+        /* 为第一列定义固定宽度，以便可靠地定位第二列 */
+        #demand-list-table th:nth-child(1),
+        #demand-list-table td:nth-child(1) {
+            width: 60px;
+            min-width: 60px;
+            max-width: 60px;
+        }
+
+        /* 冻结第一列 */
+        #demand-list-table th:nth-child(1),
+        #demand-list-table td:nth-child(1) {
+            position: sticky;
+            left: 0;
+            z-index: 2;
+        }
+
+        /* 冻结第二列 */
+        #demand-list-table th:nth-child(2),
+        #demand-list-table td:nth-child(2) {
+            position: sticky;
+            left: 60px; /* 该值等于第一列的宽度 */
+            z-index: 2;
+        }
+
+        /* 确保固定的表头单元格位于最顶层 */
+        #demand-list-table th:nth-child(1),
+        #demand-list-table th:nth-child(2) {
+            z-index: 4;
+        }
+
+        /* 为冻结单元格设置背景色，防止滚动时下方内容透出 */
+        #demand-list-table th:nth-child(1),
+        #demand-list-table th:nth-child(2) {
+            background-color: #f8f9fc;
+        }
+
+        #demand-list-table .demand-row td:nth-child(1),
+        #demand-list-table .demand-row td:nth-child(2) {
+            background-color: #eaf5ff;
+        }
+        #demand-list-table .sub-demand-row td:nth-child(1),
+        #demand-list-table .sub-demand-row td:nth-child(2) {
+            background-color: #f5faff;
+        }
+        #demand-list-table .dev-task-row td:nth-child(1),
+        #demand-list-table .dev-task-row td:nth-child(2) {
+            background-color: #ffffff;
+        }
+
+        /* 由于冻结列的背景色会覆盖行的hover效果，因此需要为它们重新应用hover样式 */
+        #demand-list-table tr:not(.demand-row):not(.sub-demand-row):hover td:nth-child(1),
+        #demand-list-table tr:not(.demand-row):not(.sub-demand-row):hover td:nth-child(2) {
+            background-color: #fafdff;
+        }
+
+        .demand-row { background-color: #eaf5ff; font-weight: bold; }
+        .sub-demand-row { background-color: #f5faff; }
+        .dev-task-row { background-color: #ffffff; }
+
+        .toggle-icon { display: inline-block; width: 20px; transition: transform 0.2s; cursor: pointer; font-family: monospace; }
+        .collapsed .toggle-icon { transform: rotate(-90deg); }
+        .sub-demand-row td:nth-child(2) { padding-left: 40px !important; }
+        .dev-task-row td:nth-child(2) { padding-left: 80px !important; }
+        .editable-progress { width: 60px; text-align: center; padding: 4px; border: 1px solid var(--border-color); border-radius: 4px; }
+        
+        /* 甘特图样式 */
+        .gantt-container { display: grid; grid-template-columns: 520px 1fr; border: 1px solid var(--border-color); }
+        .gantt-table-part .gantt-header { display: grid; grid-template-columns: 170px 120px 120px 50px 60px; font-weight: 600; background-color: #f8f9fc; }
+        .gantt-cell, .gantt-header-cell { padding: 12px 10px; border-bottom: 1px solid var(--border-color); border-right: 1px solid var(--border-color); font-size: 13px; word-break: break-word; }
+        .gantt-row { display: grid; grid-template-columns: 170px 120px 120px 50px 60px; align-items: center; height: 46px; }
+        .gantt-row.demand-row { background-color: #f0f5ff; font-weight: bold; }
+        .gantt-row.sub-demand-row .gantt-cell:first-child { padding-left: 30px; }
+        .gantt-row.dev-task-row .gantt-cell:first-child { padding-left: 60px; }
+        .gantt-chart-part { position: relative; overflow-x: scroll; }
+        .gantt-chart-area { position: relative; }
+        .gantt-bar-container { position: relative; height: 46px; border-bottom: 1px solid var(--border-color); }
+        
+        /* --- MODIFICATION START: 问题2修正 --- */
+        /* 调整计划(灰色)与实际(彩色)时间条的样式，使计划条更宽，实际条更窄且位于其上，解决遮挡问题 */
+        .gantt-bar-plan {
+            position: absolute;
+            top: 12px;
+            height: 22px;
+            background-color: #d5d8dc;
+            border-radius: 5px;
+        }
+        .gantt-bar-actual {
+            position: absolute;
+            top: 18px;
+            height: 10px;
+            background-color: var(--primary-color);
+            border-radius: 4px;
+            min-width: 5px;
+        }
+        /* --- MODIFICATION END --- */
+
+        .gantt-bar-actual.demand { background-color: var(--success-color); }
+        .gantt-bar-actual.sub-demand { background-color: var(--warning-color); }
+        .gantt-bar-actual.dev-task { background-color: var(--primary-color); }
+        .gantt-bar-progress { background-color: rgba(44, 62, 80, 0.4); height: 100%; border-radius: 4px; }
+        .gantt-today-line { position: absolute; top: 0; bottom: 0; width: 2px; background-color: var(--danger-color); z-index: 5; }
+        .gantt-header-timeline { background-color: #f8f9fc; position: sticky; top: 0; z-index: 10; border-bottom: 1px solid var(--border-color); }
+        .timeline-months, .timeline-weeks, .timeline-days { display: flex; }
+        .timeline-month, .timeline-week, .timeline-day { flex-shrink: 0; text-align: center; border-right: 1px solid var(--border-color); font-size: 12px; color: var(--text-light); }
+        .timeline-month { padding: 5px 0; font-weight: 600; }
+        .timeline-week, .timeline-day { padding: 8px 0; }
+        
+        /* --- 模态框 (Modal) 样式 --- */
+        .modal-backdrop { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 100; }
+        .modal { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; border-radius: 8px; box-shadow: 0 5px 20px rgba(0,0,0,0.2); z-index: 101; width: 900px; max-height: 90vh; display: flex; flex-direction: column; }
+        .modal-header { padding: 15px 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
+        .modal-header h3 { margin: 0; color: var(--secondary-color); }
+        .modal-close-btn { background: none; border: none; font-size: 24px; cursor: pointer; color: var(--text-light); }
+        .modal-body { padding: 20px; overflow-y: auto; flex-grow: 1; }
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 20px; }
+        .form-group { margin-bottom: 15px; }
+        .form-group.full-width { grid-column: 1 / -1; }
+        .form-group label { display: block; font-weight: 500; margin-bottom: 5px; font-size: 14px; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; box-sizing: border-box; padding: 10px; border: 1px solid var(--border-color); border-radius: 5px; font-size: 14px; }
+        .form-group input[readonly], .form-group select:disabled, .form-group textarea[readonly] { background-color: #f4f7fa; cursor: not-allowed; }
+        textarea { resize: vertical; }
+        .modal-footer { padding: 15px 20px; border-top: 1px solid var(--border-color); text-align: right; flex-shrink: 0; }
+        .priority-high { color: var(--danger-color); font-weight: bold; }
+        .priority-medium { color: var(--warning-color); font-weight: bold; }
+        .priority-low { color: #555; }
+
+        /* Report Modal Specific */
+        #report-history-view .history-card { background-color: #fff; border: 1px solid var(--border-color); border-radius: 8px; margin-bottom: 15px; }
+        #report-history-view .history-card-header { padding: 10px 15px; background-color: #f8f9fc; border-bottom: 1px solid var(--border-color); font-weight: bold; color: var(--secondary-color); }
+        #report-history-view .history-card-header .meta { font-weight: normal; font-size: 12px; color: var(--text-light); float: right; }
+        #report-history-view .history-card-body { padding: 15px; }
+        #report-history-view .history-card-body p { margin: 0 0 10px 0; white-space: pre-wrap; word-wrap: break-word; }
+        #report-history-view .history-card-body strong { color: var(--secondary-color); font-size: 13px; }
+
+        /* Display Fields Modal Specific */
+        #display-fields-modal-body { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+        #display-fields-modal-body .checkbox-group { display: flex; align-items: center; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="role-switcher">
+            <label for="role-select">当前角色:</label>
+            <select id="role-select">
+                <option value="manager">需求管理者</option>
+                <option value="developer">开发人员</option>
+            </select>
+        </div>
+        <div class="main-nav">
+            <button id="nav-demand-btn" class="nav-btn active">需求列表</button>
+            <button id="nav-project-btn" class="nav-btn">项目列表</button>
+        </div>
+        
+        <!-- 页面一: 项目列表页 -->
+        <div id="project-list-page" class="hidden">
+            <div class="page-header">
+                <h1>项目列表</h1>
+                <button id="show-create-project-modal-btn" class="btn btn-primary">创建新项目</button>
+            </div>
+            <div class="filter-section">
+                <div class="filter-group"> <label for="search-name">项目名称</label> <input type="text" id="search-name" placeholder="输入名称搜索"> </div>
+                <div class="filter-group"> <label for="filter-owner">负责人</label> <select id="filter-owner"><option value="">全部</option></select> </div>
+                <div class="filter-group"> <label for="filter-industry">行业</label> <select id="filter-industry"><option value="">全部</option></select> </div>
+                <div class="filter-group"> <label for="project-filter-category">项目类别</label> <select id="project-filter-category"><option value="">全部</option></select> </div>
+                <div style="align-self: flex-end; display: flex; gap: 10px;"> <button id="filter-btn" class="btn btn-primary">搜索</button> <button id="reset-btn" class="btn btn-secondary">重置</button> </div>
+            </div>
+            <div class="data-table-wrapper">
+                <table class="data-table" id="project-list-table">
+                    <thead> 
+                        <tr> 
+                            <th style="width: 25%;">项目名称</th> 
+                            <th style="width: 15%;">客户名称</th> 
+                            <th style="width: 15%;">开始时间</th> 
+                            <th style="width: 10%;">负责人</th>
+                            <th style="width: 15%;">项目类别</th>
+                            <th style="width: 10%;">周报</th>
+                            <th style="width: 10%;">操作</th> 
+                        </tr> 
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 页面二: 需求列表页 -->
+        <div id="demand-list-page">
+            <div class="page-header">
+                <h1>需求列表</h1>
+            </div>
+             <div class="filter-section">
+                <div class="filter-group"> <label for="demand-search-name">需求名称</label> <input type="text" id="demand-search-name" placeholder="输入名称搜索"> </div>
+                <div class="filter-group"> <label for="demand-filter-owner">负责人</label> <select id="demand-filter-owner"><option value="">全部</option></select> </div>
+                <div class="filter-group"> <label for="demand-filter-importance">重要程度</label> <select id="demand-filter-importance"><option value="">全部</option><option>重要</option><option>一般</option></select> </div>
+                <div class="filter-group"> <label for="demand-filter-category">需求类别</label> <select id="demand-filter-category"><option value="">全部</option></select> </div>
+                <div style="align-self: flex-end; display: flex; gap: 10px;"> <button id="demand-filter-btn" class="btn btn-primary">搜索</button> <button id="demand-reset-btn" class="btn btn-secondary">重置</button> </div>
+            </div>
+            <div class="view-actions">
+                <div class="main-actions">
+                    <button id="show-create-demand-modal-btn" class="btn btn-primary">创建需求</button>
+                    <button id="import-demands-btn" class="btn btn-secondary">导入需求</button>
+                    <button id="toggle-all-demands-btn" class="btn btn-secondary">全部展开</button>
+                </div>
+                <div class="gantt-controls">
+                    <button id="show-display-fields-modal-btn" class="btn btn-secondary">显示字段</button>
+                    <button id="switch-view-btn" class="btn btn-secondary" data-view="gantt">切换到甘特图</button>
+                    <div id="gantt-scale-controls" class="btn-group hidden"> <button class="btn btn-secondary btn-sm" data-scale="day">日</button> <button class="btn btn-secondary btn-sm active" data-scale="week">周</button> </div>
+                </div>
+            </div>
+            <div id="demand-list-view" class="data-table-wrapper">
+                 <table class="data-table" id="demand-list-table">
+                    <thead> 
+                        <tr> 
+                            <th style="width: 40px;"></th>
+                            <th style="width: 250px;">需求（任务）名称</th> 
+                            <th style="width: 120px;">重要程度</th> 
+                            <th style="width: 150px;">需求分类</th> 
+                            <th style="width: 100px;">负责人</th> 
+                            <th style="width: 120px;">计划开始时间</th>
+                            <th style="width: 120px;">计划支撑到位时间</th> 
+                            <th style="width: 80px;">工期</th>
+                            <th style="width: 80px;">状态</th> 
+                            <th style="width: 150px;">进度</th> 
+                            <th style="width: 250px;">日报</th>
+                            <th style="width: 250px;">周报</th>
+                            <th style="width: 100px;">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            <div id="gantt-chart-view" class="hidden"></div>
+        </div>
+    </div>
+
+    <!-- 模态框 -->
+    <div id="modal-backdrop" class="modal-backdrop hidden"></div>
+    <div id="create-project-modal" class="modal hidden" style="width: 500px;">
+        <div class="modal-header"><h3 id="project-modal-title">创建新项目</h3><button class="modal-close-btn">&times;</button></div>
+        <div class="modal-body">
+            <form id="project-form">
+                <input type="hidden" id="edit-project-id">
+                <div class="form-group"><label for="new-project-id">项目编号</label><input type="text" id="new-project-id"></div>
+                <div class="form-group"><label for="new-project-name">项目名称</label><input type="text" id="new-project-name" required></div>
+                <div class="form-group"><label for="new-project-client">客户名称</label><input type="text" id="new-project-client"></div>
+                <div class="form-group"><label for="new-project-owner">负责人</label><select id="new-project-owner" required></select></div>
+                <div class="form-group"><label for="new-project-category">项目类别</label><select id="new-project-category" required></select></div>
+                <div class="form-group"><label for="new-project-industry">客户行业</label><select id="new-project-industry"></select></div>
+                 <div class="form-group"><label for="new-project-create-date">创建日期</label><input type="date" id="new-project-create-date"></div>
+            </form>
+        </div>
+        <div class="modal-footer"><button class="btn btn-secondary modal-close-btn">取消</button><button id="save-project-btn" class="btn btn-primary">创建</button></div>
+    </div>
+    <div id="create-demand-modal" class="modal hidden">
+         <div class="modal-header"><h3 id="demand-modal-title">创建需求</h3><button class="modal-close-btn">&times;</button></div>
+         <div class="modal-body">
+            <input type="hidden" id="edit-demand-id">
+            <form id="demand-form">
+                <div class="form-grid">
+                    <div class="form-group"><label for="new-demand-name">需求名称</label><input type="text" id="new-demand-name" required></div>
+                    <div class="form-group"><label for="new-demand-owner">负责人</label><select id="new-demand-owner" required></select></div>
+                    <div class="form-group"><label for="new-demand-id">需求编号</label><input type="text" id="new-demand-id"></div>
+                    <div class="form-group"><label for="new-demand-importance">重要程度</label><select id="new-demand-importance"><option>重要</option><option>一般</option></select></div>
+                    <div class="form-group"><label for="new-demand-category">需求类别</label><select id="new-demand-category" required></select></div>
+                    <div class="form-group full-width"><label for="new-demand-description">需求描述</label><textarea id="new-demand-description" rows="3"></textarea></div>
+                    <div class="form-group"><label for="new-demand-contact-person">需求联系人</label><input type="text" id="new-demand-contact-person"></div>
+                    <div class="form-group"><label for="new-demand-contact-phone">需求联系人电话</label><input type="text" id="new-demand-contact-phone"></div>
+                    <div class="form-group"><label for="new-demand-contact-dept">需求联系人部门</label><select id="new-demand-contact-dept"><option>市场部</option><option>技术部</option><option>产品部</option><option>运营部</option></select></div>
+                    <div class="form-group"><label for="new-demand-dev-lead">需求开发主管</label><input type="text" id="new-demand-dev-lead"></div>
+                    <div class="form-group"><label for="new-client-name">客户名称</label><input type="text" id="new-client-name"></div>
+                    <div class="form-group"><label for="new-client-industry">客户行业</label><select id="new-client-industry"></select></div>
+                    <div class="form-group"><label for="new-opportunity-id">商机编号</label><input type="text" id="new-opportunity-id"></div>
+                    <div class="form-group"><label for="new-opportunity-name">商机名称</label><input type="text" id="new-opportunity-name"></div>
+                    <div class="form-group"><label for="new-contract-id">合同编号</label><input type="text" id="new-contract-id"></div>
+                    <div class="form-group"><label for="new-contract-name">合同名称</label><input type="text" id="new-contract-name"></div>
+                    <div class="form-group"><label for="new-demand-urgency">需求紧急程度</label><select id="new-demand-urgency"><option>高</option><option>中</option><option>低</option></select></div>
+                    <div class="form-group"><label for="new-demand-stage">需求阶段</label><select id="new-demand-stage"><option>初步沟通</option><option>需求确认</option><option>方案设计</option><option>开发中</option><option>已上线</option></select></div>
+                    <div class="form-group"><label for="new-demand-creator">需求提出人</label><input type="text" id="new-demand-creator"></div>
+                    <div class="form-group"><label for="new-business-category">业务分类</label><select id="new-business-category"><option>核心业务</option><option>支撑业务</option><option>创新业务</option></select></div>
+                    <div class="form-group"><label for="new-initial-workload">主管初评工作量 (人/天)</label><input type="number" id="new-initial-workload"></div>
+                    <div class="form-group"><label for="new-expert-workload">专家综合评审工作量 (人/天)</label><input type="number" id="new-expert-workload"></div>
+                    <div class="form-group"><label for="new-actual-workload">实际工作量 (人/天)</label><input type="number" id="new-actual-workload"></div>
+                    <div class="form-group"><label for="new-demand-attachment">附件</label><input type="file" id="new-demand-attachment"></div>
+                    <div class="form-group"><label for="new-demand-submit-time">需求提交时间</label><input type="date" id="new-demand-submit-time"></div>
+                    <div class="form-group"><label for="new-expected-completion-time">期望完成时间</label><input type="date" id="new-expected-completion-time"></div>
+                    <div class="form-group"><label for="new-planned-support-time">计划支撑到位时间</label><input type="date" id="new-planned-support-time"></div>
+                    <div class="form-group"><label for="new-actual-completion-time">实际完成时间</label><input type="date" id="new-actual-completion-time"></div>
+                    <div class="form-group"><label for="new-demand-plannedStartTime">计划开始日期</label><input type="date" id="new-demand-plannedStartTime"></div>
+                    <div class="form-group hidden full-width" id="demand-progress-auto-label"><label>完成进度 (%)</label><p style="padding-top: 10px; color: var(--text-light);">由任务分类或开发任务进度自动汇总</p></div>
+                    <div class="form-group full-width" id="demand-progress-group"><label for="new-demand-progress">完成进度 (%)</label><input type="number" id="new-demand-progress" min="0" max="100"></div>
+                </div>
+            </form>
+         </div>
+         <div class="modal-footer"><button class="btn btn-secondary modal-close-btn">取消</button><button id="save-demand-btn" class="btn btn-primary">保存</button></div>
+    </div>
+    <!-- 任务分类模态框 -->
+    <div id="sub-demand-modal" class="modal hidden" style="width: 700px;">
+        <div class="modal-header"><h3 id="sub-demand-modal-title">创建任务分类</h3><button class="modal-close-btn">&times;</button></div>
+        <div class="modal-body">
+             <input type="hidden" id="edit-sub-demand-id">
+            <form id="sub-demand-form">
+                <input type="hidden" id="parent-main-demand-id">
+                <div class="form-grid">
+                    <div class="form-group full-width"><label for="new-sub-demand-name">任务分类名称</label><input type="text" id="new-sub-demand-name"></div>
+                    <div class="form-group"><label for="new-sub-demand-plannedStartTime">计划开始时间</label><input type="date" id="new-sub-demand-plannedStartTime"></div>
+                    <div class="form-group"><label for="new-sub-demand-plannedSupportTime">计划支撑到位时间</label><input type="date" id="new-sub-demand-plannedSupportTime"></div>
+                    <div class="form-group"><label for="new-sub-demand-actualStartTime">实际开始时间</label><input type="date" id="new-sub-demand-actualStartTime"></div>
+                    <div class="form-group"><label for="new-sub-demand-actualCompletionTime">实际完成时间</label><input type="date" id="new-sub-demand-actualCompletionTime"></div>
+
+                    <div class="form-group full-width" id="sub-demand-progress-group">
+                        <label for="new-sub-demand-progress">完成进度 (%)</label>
+                        <input type="number" id="new-sub-demand-progress" min="0" max="100" value="0">
+                    </div>
+                    <div class="form-group hidden full-width" id="sub-demand-progress-auto-label">
+                        <label>完成进度 (%)</label>
+                        <p style="padding-top: 10px; color: var(--text-light);">由开发任务进度自动汇总</p>
+                    </div>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer"><button class="btn btn-secondary modal-close-btn">取消</button><button id="save-sub-demand-btn" class="btn btn-primary">确认</button></div>
+    </div>
+    <!-- 开发任务模态框 -->
+    <div id="dev-task-modal" class="modal hidden" style="width: 700px;">
+        <div class="modal-header"><h3 id="dev-task-modal-title">创建开发任务</h3><button class="modal-close-btn">&times;</button></div>
+        <div class="modal-body">
+            <input type="hidden" id="edit-dev-task-id">
+            <form id="dev-task-form">
+                <input type="hidden" id="parent-sub-demand-id">
+                <div class="form-grid">
+                    <div class="form-group full-width"><label for="new-dev-task-name">开发任务名称</label><input type="text" id="new-dev-task-name" required></div>
+                    <div class="form-group"><label for="new-dev-task-owner">负责人</label><select id="new-dev-task-owner" required></select></div>
+                    <div class="form-group"><label for="new-dev-task-progress">完成进度 (%)</label><input type="number" id="new-dev-task-progress" min="0" max="100" value="0"></div>
+                    <div class="form-group"><label for="new-dev-task-plannedStartTime">计划开始时间</label><input type="date" id="new-dev-task-plannedStartTime"></div>
+                    <div class="form-group"><label for="new-dev-task-plannedSupportTime">计划完成时间</label><input type="date" id="new-dev-task-plannedSupportTime"></div>
+                    <div class="form-group"><label for="new-dev-task-actualStartTime">实际开始时间</label><input type="date" id="new-dev-task-actualStartTime"></div>
+                    <div class="form-group"><label for="new-dev-task-actualCompletionTime">实际完成时间</label><input type="date" id="new-dev-task-actualCompletionTime"></div>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer"><button class="btn btn-secondary modal-close-btn">取消</button><button id="save-dev-task-btn" class="btn btn-primary">确认</button></div>
+    </div>
+    <!-- 报告详情/编辑模态框 -->
+    <div id="report-detail-modal" class="modal hidden" style="width: 600px;">
+        <div class="modal-header">
+            <h3 id="report-modal-title">报告历史</h3>
+            <button class="modal-close-btn">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div id="report-history-view"></div>
+            <div id="report-edit-view" class="hidden">
+                 <form id="report-edit-form">
+                    <input type="hidden" id="report-item-id">
+                    <input type="hidden" id="report-item-type">
+                    <input type="hidden" id="report-type">
+                    <div class="form-group">
+                        <label>工作总结与存在问题</label>
+                        <textarea id="report-edit-summary" rows="5"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>下步计划</label>
+                        <textarea id="report-edit-issuesAndPlan" rows="5"></textarea>
+                    </div>
+                </form>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <div id="report-history-footer">
+                <button class="btn btn-secondary modal-close-btn">关闭</button>
+                <button id="report-add-new-btn" class="btn btn-primary">新增报告</button>
+            </div>
+            <div id="report-edit-footer" class="hidden">
+                <button id="report-cancel-edit-btn" class="btn btn-secondary">取消</button>
+                <button id="report-save-btn" class="btn btn-primary">保存</button>
+            </div>
+        </div>
+    </div>
+    <!-- 显示字段模态框 -->
+    <div id="display-fields-modal" class="modal hidden" style="width: 500px;">
+        <div class="modal-header"><h3>选择显示字段</h3><button class="modal-close-btn">&times;</button></div>
+        <div id="display-fields-modal-body" class="modal-body"></div>
+        <div class="modal-footer"><button class="btn btn-secondary modal-close-btn">关闭</button></div>
+    </div>
+
+    <div id="add-item-popover" class="popover-menu hidden"></div>
+
+
+<script>
+// --- 数据模拟 ---
+const mockData = {
+    users: ['张三', '李四', '王五', '孙小美', '赵六', '周七', '吴八', '郑九'],
+    projects: [
+        { 
+            id: 'p1', name: '济源城市生命线', owner: '张三', clientName: '济源市政府', industry: '党政', category: '城市生命线', status: '进行中', createDate: '2025-08-01', completionDate: '2025-10-31',
+            reports: {
+                weekly: [
+                    { date: '2025-09-22', author: '张三', summary: '项目整体按计划推进，本周重点攻克大屏前端开发。', issuesAndPlan: '风险：GIS引擎集成存在技术难点，下周组织专题会议。' },
+                    { date: '2025-09-15', author: '张三', summary: '完成了GIS引擎的初步集成，但性能不达标。', issuesAndPlan: '下周将进行性能调优。' },
+                    { date: '2025-09-08', author: '张三', summary: '项目启动，完成技术选型和环境搭建。', issuesAndPlan: '下周开始核心模块开发。' }
+                ],
+            }
+        },
+        { 
+            id: 'p2', name: '智慧园区IOC大屏', owner: '李四', clientName: '未来科技园', industry: '工业能源', category: '智慧社区', status: '已完成', createDate: '2025-07-01', completionDate: '2025-09-30',
+            reports: { weekly: [] }
+        },
+        { 
+            id: 'p3', name: '内部CRM系统重构', owner: '王五', clientName: '公司内部', industry: '金融', category: '其他', status: '待开始', createDate: '2025-09-01', completionDate: '2025-11-30',
+            reports: { weekly: [] }
+        },
+    ],
+    demands: { // 需求
+        'd1': { id: 'd1', name: '大屏开发 (周期较长)', owner: '张三', status: '进行中', progress: 0, subDemandIds: ['sdb1', 'sdb2'],
+            demandId: 'XQ-2025-001', description: '开发一个用于城市生命线监控的综合IOC大屏', importance: '重要', urgency: '高', category: '城市生命线', 
+            plannedStartTime: '2025-09-01', plannedSupportTime: '2025-09-25', actualStartTime: '2025-09-02', actualCompletionTime: '', delayRisk: '否',
+            reports: { 
+                daily: [
+                    { date: '2025-09-28', author: '王五', summary: '联调测试完成，修复了3个BUG。', issuesAndPlan: '准备提测。' },
+                    { date: '2025-09-27', author: '王五', summary: '联调中发现数据格式不匹配问题，与后端紧急沟通解决。', issuesAndPlan: '继续进行联调测试。' },
+                    { date: '2025-09-26', author: '王五', summary: '完成了数据接入和图表组件调试。', issuesAndPlan: '计划：开始联调测试。'},
+                ], 
+                weekly: [
+                    { date: '2025-09-22', author: '张三', summary: '完成第一周开发任务，整体进度符合预期。', issuesAndPlan: '计划：本周开始大屏前端部分的开发工作。' },
+                    { date: '2025-09-15', author: '张三', summary: '需求澄清和UI设计稿评审完成。', issuesAndPlan: '下周正式进入开发阶段。' }
+                ], 
+            }
+        },
+        'd2': { id: 'd2', name: '用户认证模块', owner: '李四', status: '未开始', progress: 0, subDemandIds: ['sdb3'], 
+            demandId: 'XQ-2025-002', importance: '重要', urgency: '中', category: '智慧警务', plannedStartTime: '2025-09-28', plannedSupportTime: '2025-10-10', actualStartTime: '', actualCompletionTime: '', delayRisk: '否', reports: { daily: [], weekly: [] }
+        },
+        'd3': { id: 'd3', name: '核心数据接口', owner: '王五', status: '已完成', progress: 100, devTaskIds: ['dt3_1'],
+            demandId: 'XQ-2025-003', importance: '一般', urgency: '高', category: '其他', plannedStartTime: '2025-09-02', plannedSupportTime: '2025-09-12', actualStartTime: '2025-09-02', actualCompletionTime: '2025-09-14', delayRisk: '否', reports: { daily: [], weekly: [] }
+        },
+    },
+    subDemands: { // 任务分类
+        'sdb1': { id: 'sdb1', name: '数据驾驶舱', status: '进行中', progress: 0, devTaskIds: ['dt1_1', 'dt1_2'], reports: { daily: [], weekly: [] }, plannedStartTime: '2025-09-01', plannedSupportTime: '2025-09-20', actualStartTime: '2025-09-01', actualCompletionTime: '', delayRisk: '否' },
+        'sdb2': { id: 'sdb2', name: '告警中心', status: '进行中', progress: 0, devTaskIds: ['dt1_3'], reports: { daily: [], weekly: [] }, plannedStartTime: '2025-09-06', plannedSupportTime: '2025-09-18', actualStartTime: '2025-09-06', actualCompletionTime: '', delayRisk: '否' },
+        'sdb3': { id: 'sdb3', name: '统一认证服务', status: '未开始', progress: 0, devTaskIds: ['dt2_1', 'dt2_2'], reports: { daily: [], weekly: [] }, plannedStartTime: '2025-09-28', plannedSupportTime: '2025-10-12', actualStartTime: '', actualCompletionTime: '', delayRisk: '否' },
+    },
+    devTasks: { // 开发任务
+        'dt1_1': { id: 'dt1_1', name: 'UI设计', owner: '孙小美', status: '已完成', progress: 100, plannedStartTime: '2025-09-01', plannedSupportTime: '2025-09-07', actualStartTime: '2025-09-01', actualCompletionTime: '2025-09-06', reports: { daily: [], weekly: [] } },
+        'dt1_2': { id: 'dt1_2', name: '前端开发', owner: '王五', status: '进行中', progress: 70, plannedStartTime: '2025-09-08', plannedSupportTime: '2025-09-20', actualStartTime: '2025-09-08', actualCompletionTime: '', reports: { daily: [], weekly: [] } },
+        'dt1_3': { id: 'dt1_3', name: '后端开发', owner: '赵六', status: '进行中', progress: 30, plannedStartTime: '2025-09-06', plannedSupportTime: '2025-09-18', actualStartTime: '2025-09-07', actualCompletionTime: '', reports: { daily: [], weekly: [] } },
+        'dt2_1': { id: 'dt2_1', name: '统一登录接口', owner: '周七', status: '未开始', progress: 0, plannedStartTime: '2025-09-28', plannedSupportTime: '2025-10-05', actualStartTime: '', actualCompletionTime: '', reports: { daily: [], weekly: [] } },
+        'dt2_2': { id: 'dt2_2', name: '权限管理后台', owner: '吴八', status: '未开始', progress: 0, plannedStartTime: '2025-10-01', plannedSupportTime: '2025-10-12', actualStartTime: '', actualCompletionTime: '', reports: { daily: [], weekly: [] } },
+        'dt3_1': { id: 'dt3_1', name: '数据API开发', owner: '郑九', status: '已完成', progress: 100, plannedStartTime: '2025-09-02', plannedSupportTime: '2025-09-14', actualStartTime: '2025-09-02', actualCompletionTime: '2025-09-14', reports: { daily: [], weekly: [] } },
+    }
+};
+
+// --- Helper Functions ---
+let currentUserRole = 'manager'; // 'manager' or 'developer'
+
+// --- MODIFICATION START: 问题1 & 3修正 ---
+// 将“今日”的日期从9.23修改为9.28，以修正红线位置和超期任务的实际进度条渲染
+// const TODAY = new Date('2025-09-28'); // Previous definition could cause timezone issues (parses as UTC midnight)
+// By setting the date parts explicitly, we ensure it's midnight in the local timezone, making it consistent with how other date strings are parsed.
+const today_src = new Date('2025-09-28');
+const TODAY = new Date(today_src.getFullYear(), today_src.getMonth(), today_src.getDate());
+// --- MODIFICATION END ---
+
+const INDUSTRIES = ['工业能源', '交通', '农商', '金融', '党政', '执法', '文旅教育', '医卫'];
+const CATEGORIES = ['视频综合应用', '智慧警务', '智慧社区', '智慧监管', '加油站税控', '城市生命线', 'MaaS平台（大模型）', '其他'];
+const DISPLAYABLE_FIELDS = [
+    '重要程度', '负责人', '计划开始时间', '计划支撑到位时间', 
+    '实际开始时间', '实际完成时间', '工期', '状态', '进度', 
+    '日报', '周报', '需求描述', '需求联系人', '需求联系人电话', 
+    '需求联系人部门', '需求开发主管', '客户名称', '客户行业', '商机编号', '商机名称', 
+    '合同编号', '合同名称', '需求阶段', '需求提出人', '需求分类', '业务分类', 
+    '主管初评工作量', '专家综合评审工作量', '实际工作量', '需求提交时间', '期望完成时间'
+];
+
+let visibleDemandFields = new Set([
+    '重要程度', '需求分类', '负责人', '计划开始时间', '计划支撑到位时间', '工期', '状态', '进度', '日报', '周报'
+]);
+
+function getStatusObject(item) {
+    const { status, progress } = item;
+    if (status === '已关闭') return { text: '已关闭', color: 'var(--text-light)'};
+    if (progress >= 100 || status === '已完成') return { text: '已完成', color: 'var(--success-color)'};
+    if (status === '进行中') return { text: '进行中', color: 'var(--primary-color)'};
+    return { text: '未开始', color: 'var(--text-light)'};
+}
+
+function calculateDuration(item) {
+    // 1. Unstarted tasks: If there is no actual start time, display is empty.
+    if (!item.actualStartTime) {
+        return '';
+    }
+
+    const startDate = new Date(item.actualStartTime);
+    let endDate;
+
+    // 2. Completed tasks: If there is an actual completion time, use it.
+    if (item.actualCompletionTime) {
+        endDate = new Date(item.actualCompletionTime);
+    } 
+    // 3. In-progress tasks: Otherwise, calculate up to today.
+    else {
+        endDate = TODAY;
+    }
+
+    // Defensive check for valid dates
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime()) || endDate < startDate) {
+        return '0 天';
+    }
+
+    const durationMs = endDate - startDate;
+    // Math.ceil ensures that even part of a day counts as a full day.
+    const durationDays = Math.ceil(durationMs / (1000 * 60 * 60 * 24));
+    
+    return `${durationDays} 天`;
+}
+
+
+function updateAllProgress() {
+    Object.values(mockData.devTasks).forEach(task => { if (task.status === '已关闭') return; if (task.progress > 0 && task.progress < 100) task.status = '进行中'; else if (task.progress >= 100) task.status = '已完成'; else task.status = '未开始'; });
+    Object.values(mockData.subDemands).forEach(subDemand => { if (subDemand.status === '已关闭') return; const validTasks = (subDemand.devTaskIds || []).map(id => mockData.devTasks[id]).filter(t => t && t.status !== '已关闭'); if (validTasks.length > 0) { const totalProgress = validTasks.reduce((sum, task) => sum + (task.progress || 0), 0); subDemand.progress = Math.round(totalProgress / validTasks.length); } if (subDemand.progress > 0 && subDemand.progress < 100) subDemand.status = '进行中'; else if (subDemand.progress >= 100) subDemand.status = '已完成'; else subDemand.status = '未开始'; });
+    Object.values(mockData.demands).forEach(demand => { if (demand.status === '已关闭') return; const children = [ ...(demand.subDemandIds || []).map(id => mockData.subDemands[id]), ...(demand.devTaskIds || []).map(id => mockData.devTasks[id]) ].filter(c => c && c.status !== '已关闭'); if (children.length > 0) { const totalProgress = children.reduce((sum, child) => sum + (child.progress || 0), 0); demand.progress = Math.round(totalProgress / children.length); } if (demand.progress > 0 && demand.progress < 100) demand.status = '进行中'; else if (demand.progress >= 100) demand.status = '已完成'; else demand.status = '未开始'; if (demand.progress >= 100 && !demand.actualCompletionTime) { demand.actualCompletionTime = TODAY.toISOString().split('T')[0]; } });
+}
+
+function getPriorityClass(priority) { 
+    if (priority === '重要') return 'priority-high'; 
+    if (priority === '一般') return 'priority-medium'; 
+    return 'priority-low'; 
+}
+
+function getLatestReport(item, reportType) {
+    if (!item || !item.reports || !item.reports[reportType] || item.reports[reportType].length === 0) { return null; }
+    return item.reports[reportType].reduce((latest, current) => new Date(current.date) > new Date(latest.date) ? current : latest);
+}
+
+function formatReportText(report) {
+    if (!report) return '';
+    const summary = report.summary || '';
+    const issues = report.issuesAndPlan || '';
+    return summary && issues ? `${summary}\n${issues}` : summary || issues;
+}
+
+
+document.addEventListener('DOMContentLoaded', () => {
+    let currentGanttScale = 'week';
+
+    const allPages = { project: document.getElementById('project-list-page'), demand: document.getElementById('demand-list-page') };
+    const allNavBtns = { project: document.getElementById('nav-project-btn'), demand: document.getElementById('nav-demand-btn') };
+    const demandListView = document.getElementById('demand-list-view');
+    const ganttChartView = document.getElementById('gantt-chart-view');
+    const addItemPopover = document.getElementById('add-item-popover');
+    const modalBackdrop = document.getElementById('modal-backdrop');
+    const allModals = document.querySelectorAll('.modal');
+    
+    function openModal(modal) { modalBackdrop.classList.remove('hidden'); modal.classList.remove('hidden'); }
+    function closeModal() { modalBackdrop.classList.add('hidden'); allModals.forEach(m => { m.classList.add('hidden'); const form = m.querySelector('form'); if (form) form.reset(); }); }
+    document.querySelectorAll('.modal-close-btn').forEach(btn => btn.addEventListener('click', closeModal));
+    modalBackdrop.addEventListener('click', closeModal);
+
+    function closePopover() { if (addItemPopover) { addItemPopover.classList.add('hidden'); } }
+    document.addEventListener('click', (e) => { if (!addItemPopover.contains(e.target) && !e.target.closest('.btn-add')) { closePopover(); } });
+    
+    function switchPage(pageName) {
+        Object.values(allPages).forEach(p => p.classList.add('hidden'));
+        Object.values(allNavBtns).forEach(b => b.classList.remove('active'));
+        allPages[pageName].classList.remove('hidden');
+        allNavBtns[pageName].classList.add('active');
+    }
+
+    function applyRolePermissions() {
+        const isManager = currentUserRole === 'manager';
+        
+        // --- 全局权限 ---
+        document.getElementById('nav-project-btn').style.display = isManager ? '' : 'none';
+        if (!isManager && !allPages.project.classList.contains('hidden')) {
+            switchPage('demand');
+        }
+
+        // --- 项目列表页权限 ---
+        document.getElementById('show-create-project-modal-btn').style.display = isManager ? '' : 'none';
+        document.querySelectorAll('.btn-edit-project, .btn-close-project').forEach(btn => {
+            btn.style.display = isManager ? '' : 'none';
+        });
+
+        // --- 需求列表页权限 ---
+        document.getElementById('show-create-demand-modal-btn').style.display = isManager ? '' : 'none';
+        document.getElementById('import-demands-btn').style.display = isManager ? '' : 'none';
+        document.getElementById('show-display-fields-modal-btn').style.display = isManager ? '' : 'none';
+        
+        document.querySelectorAll('.btn-edit-demand').forEach(btn => btn.disabled = !isManager);
+        document.querySelectorAll('.btn-close-demand, .btn-close-sub-demand, .btn-close-dev-task').forEach(btn => {
+            btn.style.display = isManager ? '' : 'none';
+        });
+
+        // --- 弹窗内部权限 (在打开弹窗时处理) ---
+        const demandForm = document.getElementById('demand-form');
+        demandForm.querySelectorAll('input, select, textarea').forEach(el => {
+             el.readOnly = !isManager;
+             if(el.tagName === 'SELECT') el.disabled = !isManager;
+        });
+        document.getElementById('save-demand-btn').style.display = isManager ? '' : 'none';
+    }
+
+    function renderProjectList() {
+        const tableBody = document.querySelector('#project-list-table tbody');
+        const filters = { 
+            name: document.getElementById('search-name').value.toLowerCase(), 
+            owner: document.getElementById('filter-owner').value, 
+            industry: document.getElementById('filter-industry').value,
+            category: document.getElementById('project-filter-category').value
+        };
+        tableBody.innerHTML = '';
+        const filteredProjects = mockData.projects.filter(p => 
+            (filters.name === '' || p.name.toLowerCase().includes(filters.name)) && 
+            (filters.owner === '' || p.owner === filters.owner) && 
+            (filters.industry === '' || p.industry === p.industry) &&
+            (filters.category === '' || p.category === filters.category)
+        );
+        
+        filteredProjects.forEach(project => {
+            const weekly = getLatestReport(project, 'weekly');
+            const row = document.createElement('tr');
+            if (project.status === '已关闭') row.classList.add('status-closed');
+            row.innerHTML = `
+                <td>${project.name}</td><td>${project.clientName}</td><td>${project.createDate}</td><td>${project.owner}</td>
+                <td>${project.category || ''}</td>
+                <td class="report-cell clickable-report" data-item-id="${project.id}" data-item-type="project" data-report-type="weekly">${formatReportText(weekly)}</td>
+                <td class="operations-cell">
+                     <button class="btn-link btn-edit-project" data-id="${project.id}" style="display: ${currentUserRole === 'manager' ? '' : 'none'}">编辑</button>
+                     <button class="btn-link btn-close-project" data-id="${project.id}" style="color:var(--danger-color); display: ${currentUserRole === 'manager' ? '' : 'none'}">关闭</button>
+                </td>`;
+            tableBody.appendChild(row);
+        });
+    }
+    
+    function mergeReportCells() {
+        const tableBody = document.querySelector('#demand-list-table tbody'); if (!tableBody) return;
+        tableBody.querySelectorAll('td[rowspan]').forEach(td => td.removeAttribute('rowspan'));
+        tableBody.querySelectorAll('td.report-cell-hidden').forEach(td => td.classList.remove('report-cell-hidden', 'hidden'));
+        const demandRows = tableBody.querySelectorAll('.demand-row');
+        demandRows.forEach(demandRow => {
+            const demandId = demandRow.dataset.id;
+            const allChildren = Array.from(tableBody.querySelectorAll(`tr[data-parent-id="${demandId}"]`));
+            const visibleChildren = allChildren.filter(row => !row.classList.contains('hidden'));
+            const rowspanCount = 1 + visibleChildren.length;
+            if (rowspanCount > 1) {
+                const reportCells = demandRow.querySelectorAll('[data-report-type="weekly"]');
+                reportCells.forEach(cell => cell.rowSpan = rowspanCount);
+                visibleChildren.forEach(childRow => {
+                    childRow.querySelectorAll('[data-report-type="weekly"]').forEach(cell => cell.classList.add('report-cell-hidden', 'hidden'));
+                });
+            }
+        });
+    }
+
+    function renderDemandListView() {
+        const filters = {
+            name: document.getElementById('demand-search-name').value.toLowerCase(),
+            owner: document.getElementById('demand-filter-owner').value,
+            importance: document.getElementById('demand-filter-importance').value,
+            category: document.getElementById('demand-filter-category').value
+        };
+        const tableBody = document.querySelector('#demand-list-table tbody'); 
+        tableBody.innerHTML = '';
+        const addBtnIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>`;
+        
+        const filteredDemands = Object.values(mockData.demands).filter(d => {
+            const nameMatch = d.name.toLowerCase().includes(filters.name);
+            const ownerMatch = filters.owner === '' || d.owner === filters.owner;
+            const importanceMatch = filters.importance === '' || d.importance === filters.importance;
+            const categoryMatch = filters.category === '' || d.category === filters.category;
+            return nameMatch && ownerMatch && importanceMatch && categoryMatch;
+        });
+
+        filteredDemands.forEach(demand => {
+            const status = getStatusObject(demand), daily = getLatestReport(demand, 'daily'), weekly = getLatestReport(demand, 'weekly'), duration = calculateDuration(demand);
+            const row = document.createElement('tr'); row.className = 'demand-row collapsed'; if(demand.status === '已关闭') row.classList.add('status-closed'); row.dataset.id = demand.id;
+            row.innerHTML = `
+                <td class="add-cell"><button class="btn-add" data-id="${demand.id}" data-type="demand">${addBtnIcon}</button></td>
+                <td><span class="toggle-icon">▼</span>${demand.name}</td>
+                <td class="${getPriorityClass(demand.importance)}">${demand.importance || ''}</td> 
+                <td>${demand.category || ''}</td>
+                <td>${demand.owner}</td> 
+                <td>${demand.plannedStartTime || ''}</td> <td>${demand.plannedSupportTime || ''}</td> 
+                <td>${duration}</td> <td><span style="color:${status.color}">${status.text}</span></td>
+                <td><div class="progress-bar-container"><div class="progress-bar-fill" style="width: ${demand.progress}%;">${demand.progress}%</div></div></td>
+                <td class="report-cell clickable-report" data-item-id="${demand.id}" data-item-type="demand" data-report-type="daily">${formatReportText(daily)}</td>
+                <td class="report-cell clickable-report" data-item-id="${demand.id}" data-item-type="demand" data-report-type="weekly">${formatReportText(weekly)}</td>
+                <td class="operations-cell">
+                    <button class="btn-link btn-edit-demand" data-id="${demand.id}" ${currentUserRole !== 'manager' ? 'disabled' : ''}>编辑</button>
+                    <button class="btn-link btn-close-demand" data-id="${demand.id}" style="color:var(--danger-color); display: ${currentUserRole === 'manager' ? '' : 'none'}">关闭</button>
+                </td>`;
+            tableBody.appendChild(row);
+            (demand.subDemandIds || []).forEach(subId => {
+                const subDemand = mockData.subDemands[subId]; if (!subDemand) return;
+                const subStatus = getStatusObject(subDemand), sd_daily = getLatestReport(subDemand, 'daily'), sd_weekly = getLatestReport(subDemand, 'weekly'), subDuration = calculateDuration(subDemand);
+                const subRow = document.createElement('tr'); subRow.className = 'sub-demand-row collapsed hidden'; if(subDemand.status === '已关闭') subRow.classList.add('status-closed'); subRow.dataset.id = subDemand.id; subRow.dataset.parentId = demand.id;
+                subRow.innerHTML = `
+                    <td class="add-cell"><button class="btn-add" data-id="${subDemand.id}" data-type="subDemand">${addBtnIcon}</button></td>
+                    <td><span class="toggle-icon">▼</span>${subDemand.name}</td><td></td><td></td><td></td>
+                    <td>${subDemand.plannedStartTime||''}</td><td>${subDemand.plannedSupportTime||''}</td><td>${subDuration}</td>
+                    <td><span style="color:${subStatus.color}">${subStatus.text}</span></td>
+                    <td><div class="progress-bar-container"><div class="progress-bar-fill" style="width:${subDemand.progress}%;">${subDemand.progress}%</div></div></td>
+                    <td class="report-cell clickable-report" data-item-id="${subDemand.id}" data-item-type="subDemand" data-report-type="daily">${formatReportText(sd_daily)}</td>
+                    <td class="report-cell clickable-report" data-item-id="${subDemand.id}" data-item-type="subDemand" data-report-type="weekly">${formatReportText(sd_weekly)}</td>
+                    <td class="operations-cell">
+                        <button class="btn-link btn-edit-sub-demand" data-id="${subDemand.id}">编辑</button>
+                        <button class="btn-link btn-close-sub-demand" data-id="${subDemand.id}" style="color:var(--danger-color); display: ${currentUserRole === 'manager' ? '' : 'none'}">关闭</button>
+                    </td>`;
+                tableBody.appendChild(subRow);
+                (subDemand.devTaskIds || []).forEach(devId => {
+                    const devTask = mockData.devTasks[devId]; if (!devTask) return;
+                    const taskStatus=getStatusObject(devTask), dt_daily=getLatestReport(devTask,'daily'), dt_weekly=getLatestReport(devTask,'weekly'), taskDuration=calculateDuration(devTask);
+                    const taskRow = document.createElement('tr'); taskRow.className = 'dev-task-row hidden'; if(devTask.status === '已关闭') taskRow.classList.add('status-closed'); taskRow.dataset.parentId = demand.id; taskRow.dataset.parentSubId = subDemand.id;
+                    taskRow.innerHTML = `
+                        <td class="add-cell"></td><td>${devTask.name}</td><td></td><td></td><td>${devTask.owner}</td><td>${devTask.plannedStartTime||''}</td><td>${devTask.plannedSupportTime||''}</td><td>${taskDuration}</td>
+                        <td><span style="color:${taskStatus.color}">${taskStatus.text}</span></td>
+                        <td><input type="number" class="editable-progress" value="${devTask.progress}" data-id="${devId}" min="0" max="100">%</td>
+                        <td class="report-cell clickable-report" data-item-id="${devTask.id}" data-item-type="devTask" data-report-type="daily">${formatReportText(dt_daily)}</td>
+                        <td class="report-cell clickable-report" data-item-id="${devTask.id}" data-item-type="devTask" data-report-type="weekly">${formatReportText(dt_weekly)}</td>
+                        <td class="operations-cell">
+                            <button class="btn-link btn-edit-dev-task" data-id="${devId}">编辑</button>
+                            <button class="btn-link btn-close-dev-task" data-id="${devId}" style="color:var(--danger-color); display: ${currentUserRole === 'manager' ? '' : 'none'}">关闭</button>
+                        </td>`;
+                    tableBody.appendChild(taskRow);
+                });
+            });
+            (demand.devTaskIds || []).forEach(devId => {
+                const devTask = mockData.devTasks[devId]; if (!devTask) return;
+                const taskStatus=getStatusObject(devTask), dt_daily=getLatestReport(devTask,'daily'), dt_weekly=getLatestReport(devTask,'weekly'), taskDuration=calculateDuration(devTask);
+                const taskRow = document.createElement('tr'); taskRow.className = 'dev-task-row hidden'; if(devTask.status === '已关闭') taskRow.classList.add('status-closed'); taskRow.dataset.parentId = demand.id;
+                taskRow.innerHTML = `
+                    <td class="add-cell"></td><td style="padding-left:40px !important;">${devTask.name}</td><td></td><td></td><td>${devTask.owner}</td><td>${devTask.plannedStartTime||''}</td><td>${devTask.plannedSupportTime||''}</td><td>${taskDuration}</td>
+                    <td><span style="color:${taskStatus.color}">${taskStatus.text}</span></td>
+                    <td><input type="number" class="editable-progress" value="${devTask.progress}" data-id="${devId}" min="0" max="100">%</td>
+                    <td class="report-cell clickable-report" data-item-id="${devTask.id}" data-item-type="devTask" data-report-type="daily">${formatReportText(dt_daily)}</td>
+                    <td class="report-cell clickable-report" data-item-id="${devTask.id}" data-item-type="devTask" data-report-type="weekly">${formatReportText(dt_weekly)}</td>
+                    <td class="operations-cell">
+                        <button class="btn-link btn-edit-dev-task" data-id="${devId}">编辑</button>
+                        <button class="btn-link btn-close-dev-task" data-id="${devId}" style="color:var(--danger-color); display: ${currentUserRole === 'manager' ? '' : 'none'}">关闭</button>
+                    </td>`;
+                tableBody.appendChild(taskRow);
+            });
+        });
+        mergeReportCells();
+    }
+    
+    // --- Gantt Chart ---
+    function renderGanttChartView() {
+        ganttChartView.innerHTML = '';
+        const tasks = [];
+        Object.values(mockData.demands).forEach(d => {
+            if(d.status === '已关闭') return;
+            tasks.push({ ...d, type: 'demand' });
+            (d.subDemandIds || []).forEach(sid => {
+                const sd = mockData.subDemands[sid];
+                if(sd && sd.status !== '已关闭') {
+                    tasks.push({ ...sd, type: 'sub-demand' });
+                    (sd.devTaskIds || []).forEach(tid => {
+                        const t = mockData.devTasks[tid];
+                        if(t && t.status !== '已关闭') tasks.push({ ...t, type: 'dev-task' });
+                    });
+                }
+            });
+            (d.devTaskIds || []).forEach(tid => {
+                const t = mockData.devTasks[tid];
+                if(t && t.status !== '已关闭') tasks.push({ ...t, type: 'dev-task' });
+            });
+        });
+
+        if (tasks.length === 0) { ganttChartView.innerHTML = `<div style="text-align:center; padding: 20px;">暂无有效任务可生成甘特图。</div>`; return; }
+
+        let minDate = new Date('2999-12-31'), maxDate = new Date('2000-01-01');
+        tasks.forEach(task => { const dates = [task.plannedStartTime, task.plannedSupportTime, task.actualStartTime, task.actualCompletionTime]; dates.forEach(dateStr => { if (dateStr) { const date = new Date(dateStr); minDate = new Date(Math.min(minDate, date)); maxDate = new Date(Math.max(maxDate, date)); } }); });
+        if (minDate > maxDate) { minDate = new Date(TODAY); minDate.setDate(minDate.getDate() - 14); maxDate = new Date(TODAY); maxDate.setDate(maxDate.getDate() + 14); }
+        
+        const projectDurationMs = maxDate - minDate;
+        minDate.setDate(minDate.getDate() - 7);
+        if (currentGanttScale === 'week') { maxDate.setTime(maxDate.getTime() + projectDurationMs); } else { maxDate.setDate(maxDate.getDate() + 7); }
+        
+        const container = document.createElement('div'); container.className = 'gantt-container';
+        const tablePart = document.createElement('div'); tablePart.className = 'gantt-table-part';
+        tablePart.innerHTML = `<div class="gantt-header"><div class="gantt-header-cell">需求（任务）名称</div><div class="gantt-header-cell">计划开始</div><div class="gantt-header-cell">计划支撑到位时间</div><div class="gantt-header-cell">工期</div><div class="gantt-header-cell">进度</div></div>`;
+        const chartPart = document.createElement('div'); chartPart.className = 'gantt-chart-part';
+        const chartArea = document.createElement('div'); chartArea.className = 'gantt-chart-area';
+
+        const timelineHeader = document.createElement('div'); timelineHeader.className = 'gantt-header-timeline';
+        const timeline = document.createElement('div');
+        
+        // --- MODIFICATION START: 切换到基于像素的精确计算 ---
+        const dayInMs = 1000 * 60 * 60 * 24;
+        // 确保minDate和maxDate是当天的零点，避免时区问题
+        minDate = new Date(minDate.getFullYear(), minDate.getMonth(), minDate.getDate());
+        maxDate = new Date(maxDate.getFullYear(), maxDate.getMonth(), maxDate.getDate());
+
+        const totalDurationInDays = Math.ceil((maxDate.getTime() - minDate.getTime()) / dayInMs);
+
+        let dayPixelWidth;
+        let timelineWidthPx = 0;
+        
+        if (currentGanttScale === 'day') {
+            const dayUnitWidth = 40;
+            dayPixelWidth = dayUnitWidth;
+            timelineWidthPx = totalDurationInDays * dayPixelWidth;
+            timelineHeader.innerHTML = '<div class="timeline-months"></div><div class="timeline-days"></div>';
+            const monthsRow = timelineHeader.querySelector('.timeline-months'), daysRow = timelineHeader.querySelector('.timeline-days');
+            let d = new Date(minDate), currentMonth = -1, monthCell, daysInMonth = 0;
+            while (d <= maxDate) {
+                if (d.getMonth() !== currentMonth) { if (monthCell) monthCell.style.width = `${daysInMonth * dayUnitWidth}px`; currentMonth = d.getMonth(); monthCell = document.createElement('div'); monthCell.className = 'timeline-month'; monthCell.textContent = `${d.getFullYear()}-${String(currentMonth + 1).padStart(2, '0')}`; monthsRow.appendChild(monthCell); daysInMonth = 0; }
+                const dayUnit = document.createElement('div'); dayUnit.className = 'timeline-day'; dayUnit.textContent = String(d.getDate()).padStart(2, '0'); dayUnit.style.width = `${dayUnitWidth}px`; daysRow.appendChild(dayUnit);
+                daysInMonth++; d.setDate(d.getDate() + 1);
+            }
+            if (monthCell) monthCell.style.width = `${daysInMonth * dayUnitWidth}px`;
+
+        } else { // Week view
+            const weekUnitWidth = 60;
+            dayPixelWidth = weekUnitWidth / 7.0; // 每天的像素宽度
+            timelineWidthPx = totalDurationInDays * dayPixelWidth;
+            timelineHeader.innerHTML = '<div class="timeline-months"></div><div class="timeline-weeks"></div>';
+            const monthsRow = timelineHeader.querySelector('.timeline-months'), weeksRow = timelineHeader.querySelector('.timeline-weeks');
+            let d = new Date(minDate); 
+            // 调整到本周的开始（周日）
+            d.setDate(d.getDate() - d.getDay());
+            let currentMonth = -1, monthCell, weeksInMonth = 0;
+            while(d <= maxDate) {
+                 if (d.getMonth() !== currentMonth) { if (monthCell) monthCell.style.width = `${weeksInMonth * weekUnitWidth}px`; currentMonth = d.getMonth(); monthCell = document.createElement('div'); monthCell.className = 'timeline-month'; monthCell.textContent = `${d.getFullYear()}-${String(currentMonth + 1).padStart(2, '0')}`; monthsRow.appendChild(monthCell); weeksInMonth = 0; }
+                const weekUnit = document.createElement('div'); weekUnit.className = 'timeline-week'; weekUnit.textContent = `第${Math.floor((d.getDate() - 1) / 7) + 1}周`; weekUnit.style.width = `${weekUnitWidth}px`; weeksRow.appendChild(weekUnit);
+                weeksInMonth++; d.setDate(d.getDate() + 7);
+            }
+             if (monthCell) monthCell.style.width = `${weeksInMonth * weekUnitWidth}px`;
+        }
+
+        timelineHeader.style.width = `${timelineWidthPx}px`;
+        timeline.style.width = `${timelineWidthPx}px`;
+        
+        tasks.forEach(task => addGanttRowAndBars(task, tablePart, timeline, minDate, dayPixelWidth));
+        
+        if (TODAY >= minDate && TODAY <= maxDate) { 
+            const daysFromStart = (TODAY.getTime() - minDate.getTime()) / dayInMs;
+            const todayLine = document.createElement('div'); 
+            todayLine.className = 'gantt-today-line'; 
+            todayLine.style.left = `${(daysFromStart + 1) * dayPixelWidth}px`; 
+            timeline.appendChild(todayLine); 
+        }
+        // --- MODIFICATION END ---
+
+        chartArea.appendChild(timeline); chartPart.appendChild(timelineHeader); chartPart.appendChild(chartArea); container.appendChild(tablePart); container.appendChild(chartPart); ganttChartView.appendChild(container);
+    }
+    function addGanttRowAndBars(task, tableEl, chartEl, minDate, dayPixelWidth) {
+        const plannedStart = new Date(task.plannedStartTime), plannedEnd = new Date(task.plannedSupportTime);
+        const durationDays = (!isNaN(plannedStart) && !isNaN(plannedEnd)) ? Math.round((plannedEnd - plannedStart) / (1000 * 60 * 60 * 24)) + 1 : 'N/A';
+        const tableRow = document.createElement('div'); tableRow.className = `gantt-row ${task.type}-row`;
+        tableRow.innerHTML = `<div class="gantt-cell">${task.name}</div><div class="gantt-cell">${task.plannedStartTime || 'N/A'}</div><div class="gantt-cell">${task.plannedSupportTime || 'N/A'}</div><div class="gantt-cell">${durationDays}天</div><div class="gantt-cell">${task.progress}%</div>`;
+        tableEl.appendChild(tableRow);
+        const chartRow = document.createElement('div'); chartRow.className = 'gantt-bar-container';
+        
+        // --- MODIFICATION START: 切换到基于像素的精确计算 ---
+        const dayInMs = 1000 * 60 * 60 * 24;
+
+        if (task.plannedStartTime && task.plannedSupportTime) {
+            const pStart = new Date(task.plannedStartTime);
+            const pEnd = new Date(task.plannedSupportTime);
+            if (!isNaN(pStart) && !isNaN(pEnd) && pEnd >= pStart) {
+                const offsetDays = (pStart.getTime() - minDate.getTime()) / dayInMs;
+                const durationDays = ((pEnd.getTime() - pStart.getTime()) / dayInMs) + 1;
+                const planBar = document.createElement('div'); 
+                planBar.className = `gantt-bar-plan ${task.type}`; 
+                planBar.style.left = `${offsetDays * dayPixelWidth}px`;
+                planBar.style.width = `${durationDays * dayPixelWidth}px`;
+                chartRow.appendChild(planBar);
+            }
+        }
+
+        if (task.actualStartTime) {
+            const aStart = new Date(task.actualStartTime);
+            const aEnd = task.actualCompletionTime ? new Date(task.actualCompletionTime) : TODAY;
+            if (!isNaN(aStart) && aEnd >= aStart) {
+                const offsetDays = (aStart.getTime() - minDate.getTime()) / dayInMs;
+                const durationDays = ((aEnd.getTime() - aStart.getTime()) / dayInMs) + 1;
+                const actualBar = document.createElement('div'); 
+                actualBar.className = `gantt-bar-actual ${task.type}`;
+                actualBar.style.left = `${offsetDays * dayPixelWidth}px`;
+                actualBar.style.width = `${durationDays * dayPixelWidth}px`;
+                const barProgress = document.createElement('div'); 
+                barProgress.className = 'gantt-bar-progress'; 
+                barProgress.style.width = `${task.progress}%`; 
+                actualBar.appendChild(barProgress); 
+                chartRow.appendChild(actualBar); 
+            }
+        }
+        // --- MODIFICATION END ---
+        chartEl.appendChild(chartRow);
+    }
+
+    // --- All Modal Functions (Open, Save, etc.) ---
+    function openProjectModal(project=null){ 
+        const form = document.getElementById('project-form'); form.reset();
+        document.getElementById('edit-project-id').value = project ? project.id : '';
+        const ownerSelect = document.getElementById('new-project-owner');
+        const categorySelect = document.getElementById('new-project-category');
+        ownerSelect.innerHTML = mockData.users.map(u => `<option value="${u}">${u}</option>`).join('');
+        categorySelect.innerHTML = CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join('');
+        const modalTitle = document.getElementById('project-modal-title');
+        const saveBtn = document.getElementById('save-project-btn');
+        if (project) { 
+            modalTitle.textContent = '编辑项目'; saveBtn.textContent = '保存'; 
+            document.getElementById('new-project-id').value = project.id; 
+            document.getElementById('new-project-name').value = project.name; 
+            document.getElementById('new-project-client').value = project.clientName; 
+            ownerSelect.value = project.owner; 
+            categorySelect.value = project.category;
+            document.getElementById('new-project-industry').value = project.industry; 
+            document.getElementById('new-project-create-date').value = project.createDate;
+        } else { 
+            modalTitle.textContent = '创建新项目'; saveBtn.textContent = '创建'; 
+            document.getElementById('new-project-id').value = 'p' + (Date.now() % 1000); 
+        }
+        openModal(document.getElementById('create-project-modal'));
+     }
+    function openDemandModal(demand=null){ 
+        const form = document.getElementById('demand-form'); form.reset();
+        document.getElementById('edit-demand-id').value = demand ? demand.id : '';
+        const ownerSelect = document.getElementById('new-demand-owner');
+        const categorySelect = document.getElementById('new-demand-category');
+        const clientIndustrySelect = document.getElementById('new-client-industry');
+        ownerSelect.innerHTML = mockData.users.map(u => `<option value="${u}">${u}</option>`).join('');
+        categorySelect.innerHTML = CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join('');
+        clientIndustrySelect.innerHTML = INDUSTRIES.map(i => `<option value="${i}">${i}</option>`).join('');
+
+        
+        if (demand) {
+            document.getElementById('demand-modal-title').innerText = '编辑需求';
+            Object.keys(demand).forEach(key => {
+                const el = form.querySelector(`#new-demand-${key}`);
+                if (el) el.value = demand[key] || '';
+            });
+            ownerSelect.value = demand.owner;
+            categorySelect.value = demand.category;
+            const hasChildren = (demand.subDemandIds && demand.subDemandIds.length > 0) || (demand.devTaskIds && demand.devTaskIds.length > 0);
+            document.getElementById('demand-progress-group').classList.toggle('hidden', hasChildren);
+            document.getElementById('demand-progress-auto-label').classList.toggle('hidden', !hasChildren);
+            if (!hasChildren) document.getElementById('new-demand-progress').value = demand.progress || 0;
+        } else {
+            document.getElementById('demand-modal-title').innerText = '创建需求';
+            document.getElementById('demand-progress-group').classList.remove('hidden');
+            document.getElementById('demand-progress-auto-label').classList.add('hidden');
+        }
+        
+        const isManager = currentUserRole === 'manager';
+        form.querySelectorAll('input, select, textarea').forEach(el => {
+            if(el.tagName === 'SELECT') { el.disabled = !isManager; }
+            else { el.readOnly = !isManager; }
+        });
+        document.getElementById('save-demand-btn').style.display = isManager ? '' : 'none';
+
+        openModal(document.getElementById('create-demand-modal'));
+    }
+    function openSubDemandModal(subDemand=null, parentId=null){ 
+        const form = document.getElementById('sub-demand-form'); form.reset();
+        document.getElementById('edit-sub-demand-id').value = subDemand ? subDemand.id : '';
+        if (subDemand) {
+            document.getElementById('sub-demand-modal-title').innerText = '编辑任务分类';
+            Object.keys(subDemand).forEach(key => {
+                const el = form.querySelector(`#new-sub-demand-${key}`);
+                if (el) el.value = subDemand[key] || '';
+            });
+            const hasChildren = subDemand.devTaskIds && subDemand.devTaskIds.length > 0;
+            document.getElementById('sub-demand-progress-group').classList.toggle('hidden', hasChildren);
+            document.getElementById('sub-demand-progress-auto-label').classList.toggle('hidden', !hasChildren);
+            if (!hasChildren) document.getElementById('new-sub-demand-progress').value = subDemand.progress || 0;
+        } else {
+            document.getElementById('sub-demand-modal-title').innerText = '创建任务分类';
+            document.getElementById('parent-main-demand-id').value = parentId;
+            document.getElementById('sub-demand-progress-group').classList.remove('hidden');
+            document.getElementById('sub-demand-progress-auto-label').classList.add('hidden');
+        }
+        openModal(document.getElementById('sub-demand-modal'));
+    }
+    function openDevTaskModal(devTask=null, parentId=null, parentType='subDemand'){ 
+        const form = document.getElementById('dev-task-form'); form.reset();
+        const ownerSelect = document.getElementById('new-dev-task-owner');
+        ownerSelect.innerHTML = mockData.users.map(u => `<option value="${u}">${u}</option>`).join('');
+        document.getElementById('parent-sub-demand-id').value = parentId;
+        document.getElementById('parent-sub-demand-id').dataset.parentType = parentType;
+        document.getElementById('edit-dev-task-id').value = devTask ? devTask.id : '';
+        if (devTask) {
+            document.getElementById('dev-task-modal-title').innerText = '编辑开发任务';
+            ownerSelect.value = devTask.owner;
+            Object.keys(devTask).forEach(key => {
+                const el = form.querySelector(`#new-dev-task-${key}`);
+                if (el) el.value = devTask[key] || '';
+            });
+        } else {
+            document.getElementById('dev-task-modal-title').innerText = '创建开发任务';
+        }
+        openModal(document.getElementById('dev-task-modal'));
+    }
+    function openReportDetailModal(itemId, itemType, reportType){ 
+        const dataMap = { 'project': mockData.projects.reduce((acc,p)=>{acc[p.id]=p; return acc;}, {}), 'demand': mockData.demands, 'subDemand': mockData.subDemands, 'devTask': mockData.devTasks };
+        const item = dataMap[itemType]?.[itemId]; if (!item) return;
+
+        const reports = (item.reports?.[reportType] || []).sort((a, b) => new Date(b.date) - new Date(a.date));
+        const typeName = { daily: '日', weekly: '周'}[reportType];
+        
+        document.getElementById('report-history-view').innerHTML = reports.length > 0 ? reports.map(r => `<div class="history-card"><div class="history-card-header">${r.date}<span class="meta">by ${r.author}</span></div><div class="history-card-body"><strong>工作总结与存在问题:</strong><p>${r.summary||''}</p><strong>下步计划:</strong><p>${r.issuesAndPlan||'无'}</p></div></div>`).join('') : `<p style="color:var(--text-light);text-align:center;">暂无历史${typeName}报。</p>`;
+        document.getElementById('report-modal-title').textContent = `${item.name} - ${typeName}报历史`;
+        document.getElementById('report-edit-form').reset();
+        document.getElementById('report-item-id').value = itemId;
+        document.getElementById('report-item-type').value = itemType;
+        document.getElementById('report-type').value = reportType;
+        document.getElementById('report-history-view').classList.remove('hidden');
+        document.getElementById('report-edit-view').classList.add('hidden');
+        document.getElementById('report-history-footer').classList.remove('hidden');
+        document.getElementById('report-edit-footer').classList.add('hidden');
+        openModal(document.getElementById('report-detail-modal'));
+    }
+
+    // --- Initialization and Event Binding ---
+    function initialize() {
+        const allOwners = [...new Set([...Object.values(mockData.projects).map(p => p.owner), ...Object.values(mockData.demands).map(d => d.owner)])];
+        document.getElementById('filter-owner').innerHTML = '<option value="">全部</option>' + allOwners.map(o => `<option>${o}</option>`).join('');
+        document.getElementById('demand-filter-owner').innerHTML = '<option value="">全部</option>' + allOwners.map(o => `<option>${o}</option>`).join('');
+
+        const industryOptions = '<option value="">全部</option>' + INDUSTRIES.map(i => `<option>${i}</option>`).join('');
+        document.getElementById('filter-industry').innerHTML = industryOptions;
+        document.getElementById('new-project-industry').innerHTML = industryOptions;
+
+        const categoryOptions = '<option value="">全部</option>' + CATEGORIES.map(c => `<option>${c}</option>`).join('');
+        document.getElementById('project-filter-category').innerHTML = categoryOptions;
+        document.getElementById('demand-filter-category').innerHTML = categoryOptions;
+
+        // Role switcher logic
+        document.getElementById('role-select').addEventListener('change', (e) => {
+            currentUserRole = e.target.value;
+            renderProjectList();
+            renderDemandListView();
+            applyRolePermissions();
+        });
+
+
+        // Page switching and controls
+        allNavBtns.demand.addEventListener('click', () => switchPage('demand'));
+        allNavBtns.project.addEventListener('click', () => switchPage('project'));
+        document.getElementById('switch-view-btn').addEventListener('click', (e) => {
+            const btn = e.target;
+            const isGanttView = btn.dataset.view === 'gantt';
+            const ganttScaleControls = document.getElementById('gantt-scale-controls');
+            if (isGanttView) {
+                renderGanttChartView();
+                demandListView.classList.add('hidden'); ganttChartView.classList.remove('hidden');
+                ganttScaleControls.classList.remove('hidden'); btn.dataset.view = 'list';
+                btn.textContent = '切换到列表视图';
+            } else {
+                renderDemandListView();
+                ganttChartView.classList.add('hidden'); demandListView.classList.remove('hidden');
+                ganttScaleControls.classList.add('hidden'); btn.dataset.view = 'gantt';
+                btn.textContent = '切换到甘特图';
+                // 修正：当返回列表视图时，重置折叠/展开按钮的文本以匹配列表的默认折叠状态
+                document.getElementById('toggle-all-demands-btn').textContent = '全部展开';
+            }
+        });
+        document.getElementById('show-display-fields-modal-btn').addEventListener('click', () => {
+             const modalBody = document.getElementById('display-fields-modal-body');
+            modalBody.innerHTML = DISPLAYABLE_FIELDS.map(field => {
+                const isChecked = visibleDemandFields.has(field);
+                return `<div class="checkbox-group"><input type="checkbox" id="field-${field}" name="field-${field}" ${isChecked ? 'checked' : ''}><label for="field-${field}" style="margin-left:5px;">${field}</label></div>`;
+            }).join('');
+            openModal(document.getElementById('display-fields-modal'));
+        });
+        document.getElementById('gantt-scale-controls').querySelectorAll('button').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.getElementById('gantt-scale-controls').querySelector('.active').classList.remove('active');
+                e.target.classList.add('active'); currentGanttScale = e.target.dataset.scale;
+                renderGanttChartView();
+            });
+        });
+        
+        // --- Event Delegation for table interactions ---
+        document.body.addEventListener('click', e => {
+            const target = e.target;
+            const cell = target.closest('td');
+            const popoverItem = target.closest('.popover-item');
+
+            if(target.id === 'report-add-new-btn') {
+                document.getElementById('report-history-view').classList.add('hidden');
+                document.getElementById('report-edit-view').classList.remove('hidden');
+                document.getElementById('report-history-footer').classList.add('hidden');
+                document.getElementById('report-edit-footer').classList.remove('hidden');
+                const reportType = document.getElementById('report-type').value;
+                const typeName = { daily: '日', weekly: '周'}[reportType];
+                document.getElementById('report-modal-title').textContent = `填写新${typeName}报`;
+                return;
+            }
+             if(target.id === 'report-cancel-edit-btn') {
+                document.getElementById('report-history-view').classList.remove('hidden');
+                document.getElementById('report-edit-view').classList.add('hidden');
+                document.getElementById('report-history-footer').classList.remove('hidden');
+                document.getElementById('report-edit-footer').classList.add('hidden');
+                 const itemId = document.getElementById('report-item-id').value;
+                const itemType = document.getElementById('report-item-type').value;
+                const reportType = document.getElementById('report-type').value;
+                const dataMap = { 'project': mockData.projects.reduce((acc,p)=>{acc[p.id]=p; return acc;}, {}), 'demand': mockData.demands, 'subDemand': mockData.subDemands, 'devTask': mockData.devTasks };
+                const item = dataMap[itemType]?.[itemId];
+                const typeName = { daily: '日', weekly: '周'}[reportType];
+                document.getElementById('report-modal-title').textContent = `${item.name} - ${typeName}报历史`;
+                return;
+            }
+
+            if (popoverItem) {
+                 e.stopPropagation();
+                 const action = popoverItem.dataset.action;
+                 const id = popoverItem.dataset.id;
+                 if (action === 'create-sub-demand') { openSubDemandModal(null, id); } 
+                 else if (action === 'create-dev-task-main') { openDevTaskModal(null, id, 'demand'); }
+                 closePopover();
+                 return;
+            }
+
+            if (target.closest('.btn-add')) { 
+                 e.stopPropagation(); 
+                 const button = target.closest('.btn-add');
+                 const id = button.dataset.id;
+                 const type = button.dataset.type;
+                 if (type === 'subDemand') { closePopover(); openDevTaskModal(null, id, 'subDemand'); } 
+                 else if (type === 'demand') {
+                    const rect = button.getBoundingClientRect();
+                    addItemPopover.innerHTML = `<div class="popover-item" data-action="create-sub-demand" data-id="${id}">创建任务分类</div> <div class="popover-item" data-action="create-dev-task-main" data-id="${id}">创建开发任务</div>`;
+                    // 修正：将相对于视口的坐标转换为页面绝对坐标，以解决滚动时的定位问题
+                    addItemPopover.style.left = `${rect.left + window.scrollX}px`;
+                    addItemPopover.style.top = `${rect.bottom + window.scrollY + 5}px`;
+                    addItemPopover.classList.remove('hidden');
+                 }
+                 return; 
+            }
+            if (target.classList.contains('toggle-icon')) {
+                const parentRow = target.closest('tr'); parentRow.classList.toggle('collapsed'); const parentId = parentRow.dataset.id;
+                if (parentRow.classList.contains('demand-row')) {
+                    document.querySelectorAll(`tr[data-parent-id="${parentId}"]`).forEach(childRow => {
+                        if (!childRow.dataset.parentSubId) { childRow.classList.toggle('hidden'); if (parentRow.classList.contains('collapsed')) { childRow.classList.add('collapsed'); if (childRow.classList.contains('sub-demand-row')) { document.querySelectorAll(`tr[data-parent-sub-id="${childRow.dataset.id}"]`).forEach(gc => gc.classList.add('hidden')); } } }
+                    });
+                } else if (parentRow.classList.contains('sub-demand-row')) {
+                    document.querySelectorAll(`tr[data-parent-sub-id="${parentId}"]`).forEach(childRow => childRow.classList.toggle('hidden'));
+                }
+                setTimeout(mergeReportCells, 0);
+            }
+            if (cell && cell.classList.contains('clickable-report')) { openReportDetailModal(cell.dataset.itemId, cell.dataset.itemType, cell.dataset.reportType); }
+            if (target.classList.contains('btn-edit-project')) { openProjectModal(mockData.projects.find(p=>p.id === target.dataset.id)); }
+            if (target.classList.contains('btn-edit-demand')) { openDemandModal(mockData.demands[target.dataset.id]); }
+            if (target.classList.contains('btn-edit-sub-demand')) { openSubDemandModal(mockData.subDemands[target.dataset.id]); }
+            if (target.classList.contains('btn-edit-dev-task')) { openDevTaskModal(mockData.devTasks[target.dataset.id]); }
+            if (target.classList.contains('btn-close-project')) { if (confirm('确定关闭项目?')) { const p = mockData.projects.find(p=>p.id === target.dataset.id); if(p) p.status = '已关闭'; renderProjectList(); } }
+            if (target.classList.contains('btn-close-demand')) { if (confirm('确定关闭需求?')) { mockData.demands[target.dataset.id].status = '已关闭'; renderDemandListView(); } }
+            if (target.classList.contains('btn-close-sub-demand')) { if (confirm('确定关闭任务?')) { mockData.subDemands[target.dataset.id].status = '已关闭'; renderDemandListView(); } }
+            if (target.classList.contains('btn-close-dev-task')) { if (confirm('确定关闭任务?')) { mockData.devTasks[target.dataset.id].status = '已关闭'; renderDemandListView(); } }
+        });
+
+        // --- Save Handlers ---
+        document.getElementById('save-project-btn').addEventListener('click', () => {
+            const form = document.getElementById('project-form');
+            if (!form.checkValidity()) { return alert('请填写所有必填项'); }
+            const editId = document.getElementById('edit-project-id').value;
+            const data = {
+                id: document.getElementById('new-project-id').value,
+                name: document.getElementById('new-project-name').value,
+                clientName: document.getElementById('new-project-client').value,
+                owner: document.getElementById('new-project-owner').value,
+                category: document.getElementById('new-project-category').value,
+                industry: document.getElementById('new-project-industry').value,
+                createDate: document.getElementById('new-project-create-date').value,
+            };
+            if (editId) {
+                const project = mockData.projects.find(p => p.id === editId);
+                Object.assign(project, data);
+            } else {
+                mockData.projects.push({ ...data, status: '待开始', reports: { weekly: [] } });
+            }
+            closeModal();
+            renderProjectList();
+        });
+
+        document.getElementById('save-demand-btn').addEventListener('click', () => {
+            const form = document.getElementById('demand-form');
+            if (!form.checkValidity()) { return alert('请填写所有必填项'); }
+            const editId = document.getElementById('edit-demand-id').value;
+            const data = {
+                name: document.getElementById('new-demand-name').value,
+                owner: document.getElementById('new-demand-owner').value,
+                demandId: document.getElementById('new-demand-id').value,
+                importance: document.getElementById('new-demand-importance').value,
+                category: document.getElementById('new-demand-category').value,
+                description: document.getElementById('new-demand-description').value,
+                plannedStartTime: document.getElementById('new-demand-plannedStartTime').value,
+                plannedSupportTime: document.getElementById('new-planned-support-time').value,
+                progress: parseInt(document.getElementById('new-demand-progress').value, 10) || 0,
+                // Include all other fields from the detailed modal
+                contactPerson: document.getElementById('new-demand-contact-person').value,
+                contactPhone: document.getElementById('new-demand-contact-phone').value,
+                contactDept: document.getElementById('new-demand-contact-dept').value,
+                devLead: document.getElementById('new-demand-dev-lead').value,
+                clientName: document.getElementById('new-client-name').value,
+                clientIndustry: document.getElementById('new-client-industry').value,
+                opportunityId: document.getElementById('new-opportunity-id').value,
+                opportunityName: document.getElementById('new-opportunity-name').value,
+                contractId: document.getElementById('new-contract-id').value,
+                contractName: document.getElementById('new-contract-name').value,
+                urgency: document.getElementById('new-demand-urgency').value,
+                stage: document.getElementById('new-demand-stage').value,
+                creator: document.getElementById('new-demand-creator').value,
+                businessCategory: document.getElementById('new-business-category').value,
+                initialWorkload: document.getElementById('new-initial-workload').value,
+                expertWorkload: document.getElementById('new-expert-workload').value,
+                actualWorkload: document.getElementById('new-actual-workload').value,
+                submitTime: document.getElementById('new-demand-submit-time').value,
+                expectedCompletionTime: document.getElementById('new-expected-completion-time').value,
+                actualCompletionTime: document.getElementById('new-actual-completion-time').value,
+            };
+            if (editId) {
+                const demand = mockData.demands[editId];
+                Object.assign(demand, data);
+            } else {
+                const newId = 'd' + (Date.now() % 1000);
+                mockData.demands[newId] = { ...data, id: newId, status: '未开始', reports: { daily: [], weekly: [] } };
+            }
+            closeModal();
+            renderDemandListView();
+        });
+        
+        // Other listeners
+        document.getElementById('filter-btn').addEventListener('click', renderProjectList);
+        document.getElementById('reset-btn').addEventListener('click', () => { document.getElementById('search-name').value = ''; document.getElementById('filter-owner').value = ''; document.getElementById('filter-industry').value = ''; document.getElementById('project-filter-category').value = ''; renderProjectList(); });
+        document.getElementById('demand-filter-btn').addEventListener('click', renderDemandListView);
+        document.getElementById('demand-reset-btn').addEventListener('click', () => {
+            document.getElementById('demand-search-name').value = '';
+            document.getElementById('demand-filter-owner').value = '';
+            document.getElementById('demand-filter-importance').value = '';
+            document.getElementById('demand-filter-category').value = '';
+            renderDemandListView();
+        });
+        document.getElementById('show-create-project-modal-btn').addEventListener('click', () => openProjectModal());
+        document.getElementById('show-create-demand-modal-btn').addEventListener('click', () => openDemandModal(null));
+        document.getElementById('toggle-all-demands-btn').addEventListener('click', (e) => {
+            const btn = e.target; const isCollapseAction = btn.textContent === '全部折叠';
+            const allToggles = document.querySelectorAll('#demand-list-table .demand-row, #demand-list-table .sub-demand-row');
+            const allChildren = document.querySelectorAll('#demand-list-table .sub-demand-row, #demand-list-table .dev-task-row');
+            if (isCollapseAction) { allToggles.forEach(r => r.classList.add('collapsed')); allChildren.forEach(r => r.classList.add('hidden')); btn.textContent = '全部展开'; } 
+            else { allToggles.forEach(r => r.classList.remove('collapsed')); allChildren.forEach(r => r.classList.remove('hidden')); btn.textContent = '全部折叠'; }
+            setTimeout(mergeReportCells, 0);
+        });
+        
+        // Initial Render
+        updateAllProgress();
+        // Rename demand creator to owner for consistency
+        Object.values(mockData.demands).forEach(d => {
+            if (d.creator) {
+                d.owner = d.creator;
+                delete d.creator;
+            }
+        });
+        switchPage('demand');
+        renderProjectList();
+        renderDemandListView();
+        applyRolePermissions();
+    }
+
+    initialize();
+});
+</script>
+
+</body>
+</html>
+
+
+
